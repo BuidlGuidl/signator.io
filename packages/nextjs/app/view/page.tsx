@@ -45,7 +45,7 @@ const ViewSignature: NextPage<{
     }
   }, [rawTypedData]);
 
-  if (!message && !rawTypedData) {
+  if (!message && !rawTypedData && !searchParams["ipfs"]) {
     router.push("/");
     return null;
   }
