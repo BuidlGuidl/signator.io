@@ -12,7 +12,7 @@ import { useAccount } from "wagmi";
 import { MessageType } from "~~/services/db/schema";
 
 const Home: NextPage = () => {
-  const { address } = useAccount();
+  const { address, chain } = useAccount();
   const router = useRouter();
   const [messageText, setMessageText] = useLocalStorage("messageText", "hello ethereum");
   const [typedData, setTypedData] = useLocalStorage("typedData", eip712Example);
@@ -42,7 +42,7 @@ const Home: NextPage = () => {
   }, [typedData]);
 
   const handleSignature = async (signature: string, message: string, messageType: MessageType) => {
-    if (!address) return;
+    if (!address || !chain) return;
 
     const res = await fetch("/api/signatures", {
       method: "POST",
@@ -54,6 +54,7 @@ const Home: NextPage = () => {
         message,
         messageType,
         address,
+        chainId: chain.id,
       }),
     });
 

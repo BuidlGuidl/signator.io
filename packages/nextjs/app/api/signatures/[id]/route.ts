@@ -3,6 +3,8 @@ import { and, eq } from "drizzle-orm";
 import { recoverMessageAddress, recoverTypedDataAddress } from "viem";
 import { db } from "~~/services/db";
 import { messagesTable, signaturesTable } from "~~/services/db/schema";
+import { isContractAddress } from "~~/utils/signatorio/detect-safe";
+import { validateSafeSignature } from "~~/utils/signatorio/validate-safe-signature";
 
 export const GET = async (req: NextRequest, { params }: { params: { id: string } }) => {
   const { id } = params;
@@ -19,10 +21,18 @@ export const GET = async (req: NextRequest, { params }: { params: { id: string }
 export const POST = async (req: NextRequest, { params }: { params: { id: string } }) => {
   try {
     const { id } = params;
-    const { signature, signer } = await req.json();
+    const { signature, signer, chainId } = await req.json();
 
     if (!signature || !signer) {
       return NextResponse.json({ error: "Signature and signer are required" }, { status: 400 });
+    }
+
+    if (chainId === undefined || chainId === null) {
+      return NextResponse.json({ error: "chainId is required" }, { status: 400 });
+    }
+
+    if (typeof chainId !== "number") {
+      return NextResponse.json({ error: "chainId must be a number" }, { status: 400 });
     }
 
     const [message] = await db.select().from(messagesTable).where(eq(messagesTable.id, id)).execute();
@@ -41,16 +51,35 @@ export const POST = async (req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: "Signature already exists for this signer" }, { status: 409 });
     }
 
-    const recoveredAddress =
-      message.type === "text"
-        ? await recoverMessageAddress({
-            message: message.message,
-            signature,
-          })
-        : await recoverTypedDataAddress({ ...JSON.parse(message.message), signature });
+    // Check if signer is a contract (Safe wallet)
+    const isContract = await isContractAddress(signer, chainId);
 
-    if (recoveredAddress !== signer) {
-      return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+    if (isContract) {
+      // Use Safe signature validation
+      const isValid = await validateSafeSignature({
+        chainId,
+        safeAddress: signer,
+        message: message.type === "typed_data" ? JSON.parse(message.message) : message.message,
+        signature,
+        messageType: message.type,
+      });
+
+      if (!isValid) {
+        return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+      }
+    } else {
+      // Use standard EOA signature validation
+      const recoveredAddress =
+        message.type === "text"
+          ? await recoverMessageAddress({
+              message: message.message,
+              signature,
+            })
+          : await recoverTypedDataAddress({ ...JSON.parse(message.message), signature });
+
+      if (recoveredAddress !== signer) {
+        return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+      }
     }
 
     const [newSignature] = await db
