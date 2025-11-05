@@ -10,6 +10,7 @@ import { useLocalStorage } from "usehooks-ts";
 import { hashTypedData } from "viem";
 import { useAccount } from "wagmi";
 import { MessageType } from "~~/services/db/schema";
+import { notification } from "~~/utils/scaffold-eth/notification";
 
 const Home: NextPage = () => {
   const { address, chain } = useAccount();
@@ -25,6 +26,7 @@ const Home: NextPage = () => {
     types: true,
     message: true,
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (typedData) {
@@ -44,25 +46,38 @@ const Home: NextPage = () => {
   const handleSignature = async (signature: string, message: string, messageType: MessageType) => {
     if (!address || !chain) return;
 
-    const res = await fetch("/api/signatures", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        signature,
-        message,
-        messageType,
-        address,
-        chainId: chain.id,
-      }),
-    });
+    setIsSubmitting(true);
+    const loadingToast = notification.loading("Received signature, verifying...");
 
-    if (res.ok) {
-      const { messageId } = await res.json();
-      router.push(`/view/${messageId}`);
-    } else {
-      console.error("Failed to create message with signature", await res.json());
+    try {
+      const res = await fetch("/api/signatures", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          signature,
+          message,
+          messageType,
+          address,
+          chainId: chain.id,
+        }),
+      });
+
+      if (res.ok) {
+        const { messageId } = await res.json();
+        notification.remove(loadingToast);
+        router.push(`/view/${messageId}`);
+      } else {
+        const data = await res.json();
+        notification.remove(loadingToast);
+        notification.error(data.error || "Failed to create message with signature");
+      }
+    } catch (err) {
+      notification.remove(loadingToast);
+      notification.error(err instanceof Error ? err.message : "Failed to submit signature");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -79,6 +94,7 @@ const Home: NextPage = () => {
             messageText={messageText}
             setMessageText={setMessageText}
             onSign={signature => handleSignature(signature, messageText, "text")}
+            isSubmitting={isSubmitting}
           />
 
           <div className="divider">OR</div>
@@ -93,6 +109,7 @@ const Home: NextPage = () => {
             typedDataChecks={typedDataChecks}
             setTypedDataChecks={setTypedDataChecks}
             onSign={signature => handleSignature(signature, JSON.stringify(typedData), "typed_data")}
+            isSubmitting={isSubmitting}
           />
         </div>
       </div>
