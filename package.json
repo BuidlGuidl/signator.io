@@ -8,6 +8,7 @@
     ]
   },
   "scripts": {
+    "drizzle-kit": "yarn workspace @se-2/nextjs drizzle-kit",
     "start": "yarn workspace @se-2/nextjs dev",
     "next:lint": "yarn workspace @se-2/nextjs lint",
     "next:format": "yarn workspace @se-2/nextjs format",
