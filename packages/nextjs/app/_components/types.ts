@@ -1,4 +1,8 @@
 export const eip712Example = {
+  domain: {
+    name: "Signator.IO",
+    version: "1",
+  },
   types: {
     Greeting: [
       { name: "salutation", type: "string" },
