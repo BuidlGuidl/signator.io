@@ -13,7 +13,7 @@ import { messagesTable, signaturesTable } from "~~/services/db/schema";
 
 const ViewSignature: NextPage<{ params: { id: string } }> = ({ params }: { params: { id: string } }) => {
   const { id } = params;
-  const { address } = useAccount();
+  const { address, chain } = useAccount();
   const { openConnectModal } = useConnectModal();
 
   const [message, setMessage] = useState<string | null>(null);
@@ -91,6 +91,10 @@ const ViewSignature: NextPage<{ params: { id: string } }> = ({ params }: { param
       setIsSubmitting(true);
       setError(null);
 
+      if (!chain) {
+        throw new Error("Chain not connected");
+      }
+
       const response = await fetch(`/api/signatures/${id}`, {
         method: "POST",
         headers: {
@@ -99,6 +103,7 @@ const ViewSignature: NextPage<{ params: { id: string } }> = ({ params }: { param
         body: JSON.stringify({
           signature,
           signer: address,
+          chainId: chain.id,
         }),
       });
 

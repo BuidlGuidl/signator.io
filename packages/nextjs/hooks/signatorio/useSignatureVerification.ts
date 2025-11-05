@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { checkEip1271 } from "../../utils/signatorio/verify-signature";
+import { hashSafeMessage } from "@safe-global/protocol-kit";
 import {
   TypedDataDefinition,
   hashMessage,
@@ -9,6 +10,7 @@ import {
   recoverMessageAddress,
   recoverTypedDataAddress,
 } from "viem";
+import { getCode } from "viem/actions";
 import { useClient } from "wagmi";
 import { SignatureStatus } from "~~/types/signatorio/signatures";
 
@@ -32,22 +34,53 @@ export const useSignatureVerification = (
           }
 
           try {
-            let signingAddress = null;
-            if (message) signingAddress = await recoverMessageAddress({ message, signature: sig });
-            if (typedData) signingAddress = await recoverTypedDataAddress({ ...typedData, signature: sig });
+            // Check if address is a contract (Safe wallet)
+            const addressCode = await getCode(client, { address: addresses[index] });
+            const isContract = addressCode !== undefined && addressCode !== "0x";
 
-            if (!signingAddress) return SignatureStatus.INVALID;
-            if (signingAddress.toLowerCase() === addresses[index].toLowerCase()) {
-              return SignatureStatus.MATCH;
+            if (isContract) {
+              // Safe wallet signature verification
+              let messageHash = null;
+              if (typedData) {
+                // Safe typed data: use hashSafeMessage
+                const eip712TypedData = {
+                  domain: typedData.domain || {},
+                  types: typedData.types,
+                  message: typedData.message,
+                } as any;
+                messageHash = hashSafeMessage(eip712TypedData);
+              } else if (message) {
+                // Safe regular message: use hashMessage
+                messageHash = hashMessage(message);
+              }
+
+              if (!messageHash) return SignatureStatus.INVALID;
+              return checkEip1271(client, addresses[index], messageHash, sig);
+            } else {
+              // EOA signature verification (existing logic)
+              let signingAddress = null;
+              if (message) {
+                signingAddress = await recoverMessageAddress({ message, signature: sig });
+              } else if (typedData) {
+                signingAddress = await recoverTypedDataAddress({ ...typedData, signature: sig });
+              }
+
+              if (!signingAddress) return SignatureStatus.INVALID;
+              if (signingAddress.toLowerCase() === addresses[index].toLowerCase()) {
+                return SignatureStatus.MATCH;
+              }
+
+              // Try EIP-1271 as fallback for EOA
+              let messageHash = null;
+              if (message) {
+                messageHash = hashMessage(message);
+              } else if (typedData) {
+                messageHash = hashTypedData(typedData);
+              }
+
+              if (!messageHash) return SignatureStatus.INVALID;
+              return checkEip1271(client, addresses[index], messageHash, sig);
             }
-
-            let messageHash = null;
-            if (message) messageHash = hashMessage(message);
-            if (typedData) messageHash = hashTypedData(typedData);
-
-            if (!messageHash) return SignatureStatus.INVALID;
-
-            return checkEip1271(client, addresses[index], messageHash, sig);
           } catch (error) {
             console.error(`Signature verification failed for ${sig}:`, error);
             return SignatureStatus.INVALID;

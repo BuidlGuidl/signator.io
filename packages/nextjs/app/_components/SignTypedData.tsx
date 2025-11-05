@@ -5,6 +5,7 @@ import { TypedDataChecks } from "./types";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useSignTypedData } from "wagmi";
 import { ExclamationCircleIcon } from "@heroicons/react/24/outline";
+import { notification } from "~~/utils/scaffold-eth/notification";
 
 type TypedDataProps = {
   manualTypedData: string;
@@ -16,6 +17,7 @@ type TypedDataProps = {
   typedDataChecks: TypedDataChecks;
   setTypedDataChecks: (checks: TypedDataChecks) => void;
   onSign: (signature: string) => void;
+  isSubmitting?: boolean;
 };
 
 export const SignTypedData = ({
@@ -28,6 +30,7 @@ export const SignTypedData = ({
   typedDataChecks,
   setTypedDataChecks,
   onSign,
+  isSubmitting = false,
 }: TypedDataProps) => {
   const { isConnected } = useAccount();
   const { openConnectModal } = useConnectModal();
@@ -48,8 +51,13 @@ export const SignTypedData = ({
 
   const handleSignTypedData = async () => {
     if (!typedDataChecks.hash) return;
-    const signature = await signTypedDataAsync(typedData);
-    onSign(signature);
+    try {
+      const signature = await signTypedDataAsync(typedData);
+      onSign(signature);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "User rejected the signature request";
+      notification.error(errorMessage);
+    }
   };
 
   return (
@@ -67,8 +75,8 @@ export const SignTypedData = ({
 
       <LoadingButton
         onClick={isConnected ? handleSignTypedData : openConnectModal}
-        disabled={isPending}
-        isLoading={isPending}
+        disabled={isPending || isSubmitting}
+        isLoading={isPending || isSubmitting}
         loadingText="Signing..."
         defaultText={isConnected ? "Sign Typed Data" : "Connect Wallet"}
       />
