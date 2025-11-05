@@ -25,6 +25,7 @@ const Home: NextPage = () => {
   const [typedDataChecks, setTypedDataChecks] = useState<TypedDataChecks>({
     types: true,
     message: true,
+    hash: null,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 

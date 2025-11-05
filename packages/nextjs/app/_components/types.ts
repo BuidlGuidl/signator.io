@@ -21,5 +21,5 @@ export const eip712Example = {
 export type TypedDataChecks = {
   types: boolean;
   message: boolean;
-  hash?: string;
+  hash?: string | null;
 };

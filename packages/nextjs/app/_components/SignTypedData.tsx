@@ -45,7 +45,7 @@ export const SignTypedData = ({
     } catch (error) {
       console.log(error);
       setInvalidJson(true);
-      setTypedDataChecks({ types: false, message: false });
+      setTypedDataChecks({ types: false, message: false, hash: undefined });
     }
   };
 
@@ -100,6 +100,8 @@ const ValidationMessages = ({
     )}
     {!typedDataChecks.types && <div className="alert alert-error">Missing types in typed data</div>}
     {!typedDataChecks.message && <div className="alert alert-error">Missing message in typed data</div>}
-    {!invalidJson && !typedDataChecks.hash && <div className="alert alert-error">Invalid EIP-712 input data</div>}
+    {!invalidJson && typedDataChecks.hash === undefined && (
+      <div className="alert alert-error">Invalid EIP-712 input data</div>
+    )}
   </>
 );
